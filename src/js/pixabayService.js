@@ -19,7 +19,6 @@ export class PixabayService {
         };
 
         let requestUrl = this.#createRequestURL(parameters);
-        this.#incrementPageCount();
         return await axios.get(requestUrl).then(responce => {
             console.log(this.pageCount);
             return responce.data;
@@ -34,7 +33,7 @@ export class PixabayService {
         return this.#baseUrl + "?" + new URLSearchParams(params);
     }
 
-    #incrementPageCount() {
+    incrementPageCount() {
         this.pageCount++;
     }
 }

@@ -1,14 +1,11 @@
 import { PixabayService } from "./js/pixabayService.js"
-import Notiflix from 'notiflix';
 import iziToast from 'izitoast';
 import SimpleLightbox from "simplelightbox";
 import "simplelightbox/dist/simple-lightbox.min.css";
-import { throttle } from 'throttle-debounce';
 import 'izitoast/dist/css/iziToast.min.css';
 
 const form = document.querySelector(".search-form");
 const gallery = document.querySelector(".gallery");
-// const loadMoreButton = document.querySelector(".load-more");
 const searchInput = form.elements.searchQuery;
 const pixabayService = new PixabayService();
 
@@ -24,7 +21,7 @@ function showError(message) {
     });
 }
 
-function SetScroll() {
+function setScroll() {
     const { height: cardHeight } = document
         .querySelector(".gallery")
         .firstElementChild.getBoundingClientRect();
@@ -36,17 +33,17 @@ function SetScroll() {
 }
 
 function isScrollAtEnd() {
-    const content = document.querySelector('.gallery');
+    const content = document.querySelector('body');
     return window.innerHeight + window.scrollY >= content.offsetHeight;
 }
 
-function handleScroll() {
+async function handleScroll() {
     if (isScrollAtEnd()) {
         if (!activeScroll) {
             showMessage("We're sorry, but you've reached the end of search results.");
         }
         else {
-            fetchPhotos();
+            await fetchPhotos();
         }
     }
 }
@@ -68,34 +65,19 @@ function showSuccess(message) {
       position: 'topRight',
       color: 'green',
     });
-  }
+}
 
-// function toggleClass(element, isHide) {
-//     element.classList.toggle('hidden', isHide);
-// }
-
-// function showLoadMore() {
-//     toggleClass(loadMoreButton, false);
-// }
-
-// function hideLoadMore() {
-//     toggleClass(loadMoreButton, true);
-// }
-
-function fetchPhotos() {
-    pixabayService.fetchImages(requestMessage)
+async function fetchPhotos() {
+    return await pixabayService.fetchImages(requestMessage)
         .then(data => {
+            pixabayService.incrementPageCount();
+    
+            activeScroll = true;
             if (!data.hits.length) {
                 throw new Error("Sorry, there are no images matching your search query. Please try again.");
             }
 
             // showLoadMore();
-            let markup = data.hits.map(createMarkup).join("");
-
-            gallery.insertAdjacentHTML("beforeend", markup);
-
-            const modal = new SimpleLightbox('.gallery a');
-            SetScroll();
 
             if ((pixabayService.pageCount - 1) * pixabayService.perPage >= data.totalHits) {
                 activeScroll = false;
@@ -105,6 +87,13 @@ function fetchPhotos() {
             if (!pixabayService.pageCount > 1) {
                 showSuccess(`Hooray! We found ${data.totalHits} totalHits images.`);
             }
+            
+            let markup = data.hits.map(createMarkup).join("");
+
+            gallery.insertAdjacentHTML("beforeend", markup);
+
+            const modal = new SimpleLightbox('.gallery a');
+            setScroll();
         })
         .catch(error => {
             resetGalley();
@@ -142,16 +131,16 @@ function resetGalley () {
     pixabayService.resetPageCount();
     // hideLoadMore();
     gallery.innerHTML = "";
-    window.removeEventListener('scroll', throttle);
+    window.removeEventListener('scroll', handleScroll);
 }
 
-function onFormSubmit(event) {
+async function onFormSubmit(event) {
     event.preventDefault();
     resetGalley();
     requestMessage = searchInput.value;
-    fetchPhotos();
+    await fetchPhotos();
     
-    window.addEventListener('scroll', throttle(300, handleScroll));
+    window.addEventListener('scroll', handleScroll);
 }
 
 form.addEventListener("submit", onFormSubmit)
