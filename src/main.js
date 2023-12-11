@@ -11,6 +11,7 @@ const pixabayService = new PixabayService();
 
 let requestMessage = "";
 let activeScroll = true;
+let isLoading = false;
 
 function showError(message) {
     iziToast.show({
@@ -42,8 +43,9 @@ async function handleScroll() {
         if (!activeScroll) {
             showMessage("We're sorry, but you've reached the end of search results.");
         }
-        else {
+        else if (!isLoading) {
             await fetchPhotos();
+            setScroll();
         }
     }
 }
@@ -68,37 +70,37 @@ function showSuccess(message) {
 }
 
 async function fetchPhotos() {
-    return await pixabayService.fetchImages(requestMessage)
-        .then(data => {
-            pixabayService.incrementPageCount();
-    
-            activeScroll = true;
-            if (!data.hits.length) {
-                throw new Error("Sorry, there are no images matching your search query. Please try again.");
-            }
+    try {
+        const data = await pixabayService.fetchImages(requestMessage);
+        pixabayService.incrementPageCount();
 
-            // showLoadMore();
+        isLoading = true;
+        activeScroll = true;
+        if (!data.hits.length) {
+            throw new Error("Sorry, there are no images matching your search query. Please try again.");
+        }
 
-            if ((pixabayService.pageCount - 1) * pixabayService.perPage >= data.totalHits) {
-                activeScroll = false;
-                // toggleClass(loadMoreButton, true);
-            }
-            
-            if (!pixabayService.pageCount > 1) {
-                showSuccess(`Hooray! We found ${data.totalHits} totalHits images.`);
-            }
-            
-            let markup = data.hits.map(createMarkup).join("");
+        if ((pixabayService.pageCount - 1) * pixabayService.perPage >= data.totalHits) {
+            activeScroll = false;
+        }
+        
+        if (!pixabayService.pageCount > 1) {
+            showSuccess(`Hooray! We found ${data.totalHits} totalHits images.`);
+        }
+        
+        const markup = data.hits.map(createMarkup).join("");
 
-            gallery.insertAdjacentHTML("beforeend", markup);
+        gallery.insertAdjacentHTML("beforeend", markup);
 
-            const modal = new SimpleLightbox('.gallery a');
-            setScroll();
-        })
-        .catch(error => {
-            resetGalley();
-            showError(error);
-        });
+        const modal = new SimpleLightbox('.gallery a');
+    }
+    catch (error) {
+        resetGalley();
+        showError(error);
+    }
+    finally {
+        isLoading = false;
+    }
 }
 
 function createMarkup(matchElement) {
@@ -135,12 +137,20 @@ function resetGalley () {
 }
 
 async function onFormSubmit(event) {
-    event.preventDefault();
-    resetGalley();
-    requestMessage = searchInput.value;
-    await fetchPhotos();
-    
-    window.addEventListener('scroll', handleScroll);
+    try {
+        event.preventDefault();
+        resetGalley();
+        const tempRequest = searchInput.value.trim();
+        if (tempRequest === "") {
+            throw new Error("Sorry, we can`t handle empty request, please enter the query");
+        }
+        requestMessage = tempRequest;
+        await fetchPhotos();
+
+        window.addEventListener('scroll', handleScroll);
+    } catch (error) {
+        showError(error);
+    }
 }
 
 form.addEventListener("submit", onFormSubmit)
